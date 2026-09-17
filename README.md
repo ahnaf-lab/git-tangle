@@ -5,8 +5,8 @@ together, so that before you refactor a file you can see what silently breaks
 alongside it.
 
 This is an early, in-progress build: the current version walks the commit
-history, builds a pairwise co-change count matrix, and normalizes each pair
-into a 0-1 coupling score. The ASCII heatmap view is not built yet.
+history, builds a pairwise co-change count matrix, normalizes each pair into
+a 0-1 coupling score, and can render the strongest pairs as an ASCII heatmap.
 
 ## Install
 
@@ -58,7 +58,42 @@ Options:
 - `--repo <path>` — repository to analyse (default: current directory)
 - `--top <n>` — number of pairs to print (default: 20)
 - `--limit <n>` — only look at the last `n` commits (default: all history)
+- `--heatmap` — render the top pairs as an ASCII coupling grid instead of a
+  plain list
+- `--color` / `--no-color` — force colored heatmap output on or off (default:
+  colored only when connected to a terminal)
 - `--help` — show usage
+
+### Heatmap
+
+`--heatmap` renders the same top-N pairs as a legend-indexed grid instead of
+a flat list, so you can see at a glance which files cluster together rather
+than just the single strongest pair:
+
+```
+git-tangle --heatmap --top 10
+```
+
+```
+top 3 coupled pair(s) across 3 file(s)
+
+    0  1  2
+ 0  ·  █  ▒
+ 1  █  ·
+ 2  ▒     ·
+
+legend:
+  0  src/api.js
+  1  src/api.test.js
+  2  src/db.js
+```
+
+Rows and columns share the same file order; a cell's shading is the coupling
+score between the row's file and the column's file (blank means the pair
+never appeared together in the top-N set). `·` marks the diagonal, where a
+file is compared with itself. When the output is a terminal, cells are also
+colored from cool (weak coupling) to hot (strong coupling); pass `--no-color`
+to disable this, or `--color` to force it when piping to a file.
 
 ## How it works
 

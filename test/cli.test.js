@@ -57,3 +57,55 @@ test('CLI rejects a non-numeric --top value', () => {
     execFileSync('node', [CLI_PATH, '--top', 'nope'], { encoding: 'utf8', stdio: 'pipe' });
   }, /Command failed/);
 });
+
+test('CLI --heatmap renders a legend-indexed grid instead of the plain list', () => {
+  const { dir, git } = makeTempRepo();
+  try {
+    for (let i = 0; i < 2; i++) {
+      writeFileSync(join(dir, 'a.txt'), `rev ${i}\n`);
+      writeFileSync(join(dir, 'b.txt'), `rev ${i}\n`);
+      git('add', '.');
+      git('commit', '-q', '-m', `commit ${i}`);
+    }
+
+    const output = execFileSync('node', [CLI_PATH, '--repo', dir, '--heatmap'], { encoding: 'utf8' });
+
+    assert.match(output, /legend:/);
+    assert.match(output, /a\.txt/);
+    assert.match(output, /b\.txt/);
+    assert.ok(!/^1\.00\t2\t/m.test(output));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI --heatmap --no-color never emits ANSI escape codes', () => {
+  const { dir, git } = makeTempRepo();
+  try {
+    for (let i = 0; i < 2; i++) {
+      writeFileSync(join(dir, 'a.txt'), `rev ${i}\n`);
+      writeFileSync(join(dir, 'b.txt'), `rev ${i}\n`);
+      git('add', '.');
+      git('commit', '-q', '-m', `commit ${i}`);
+    }
+
+    const output = execFileSync(
+      'node',
+      [CLI_PATH, '--repo', dir, '--heatmap', '--no-color'],
+      { encoding: 'utf8' },
+    );
+
+    assert.ok(!output.includes('\u001b['));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI rejects passing --color and --no-color together', () => {
+  assert.throws(() => {
+    execFileSync('node', [CLI_PATH, '--heatmap', '--color', '--no-color'], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    });
+  }, /Command failed/);
+});
