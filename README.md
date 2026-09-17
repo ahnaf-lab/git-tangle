@@ -33,6 +33,23 @@ git-tangle --top 10
 git-tangle --limit 500
 ```
 
+### Single-file mode
+
+Pass a file path as the first argument to see only the pairs involving that
+file, still sorted strongest coupling first — handy right before you touch a
+file and want to know what tends to break alongside it:
+
+```sh
+git-tangle src/api.js
+git-tangle src/api.js --top 5
+```
+
+A relative path is resolved against the repository being analysed (the
+current directory by default, or whatever `--repo` points at), so running
+`git-tangle src/api.js` from inside the repo just works; absolute paths are
+also accepted. If nothing has ever changed alongside the file, `git-tangle`
+prints `no co-changed pairs found for file: <file>` instead of a list.
+
 Or, without linking:
 
 ```sh
@@ -55,6 +72,8 @@ changes for unrelated reasons — scores lower despite a larger raw count.
 
 Options:
 
+- `<file>` — restrict output to pairs involving this file (default: show
+  pairs across the whole repo)
 - `--repo <path>` — repository to analyse (default: current directory)
 - `--top <n>` — number of pairs to print (default: 20)
 - `--limit <n>` — only look at the last `n` commits (default: all history)

@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
-import { resolve } from 'node:path';
+import { resolve, relative, sep } from 'node:path';
 import { getCommitFileLists } from '../src/gitlog.js';
 import { buildCoChangeMatrix, matrixToPairs } from '../src/matrix.js';
 import { countFileAppearances, scoreCoupling } from '../src/score.js';
 import { renderHeatmap } from '../src/heatmap.js';
+import { filterPairsByFile } from '../src/filter.js';
 
 function printHelp() {
   console.log(`git-tangle - mine commit history for files that change together
 
 Usage:
-  git-tangle [--repo <path>] [--top <n>] [--limit <n>]
-  git-tangle --heatmap [--repo <path>] [--top <n>] [--limit <n>] [--color|--no-color]
+  git-tangle [<file>] [--repo <path>] [--top <n>] [--limit <n>]
+  git-tangle [<file>] --heatmap [--repo <path>] [--top <n>] [--limit <n>] [--color|--no-color]
+
+Arguments:
+  <file>          if given, only show pairs involving this file, sorted by
+                  score (default: show pairs across the whole repo)
 
 Options:
   --repo <path>   path to the git repository to analyse (default: cwd)
@@ -30,9 +35,28 @@ for which index maps to which file.
 `);
 }
 
+/**
+ * Resolves a user-supplied file argument into the repo-root-relative form
+ * that pair records use, since that is what `git log --name-only` prints.
+ * A relative argument is taken as relative to the repository being
+ * analysed (which defaults to the current directory, so the common case of
+ * running `git-tangle <file>` from inside the repo just works); an absolute
+ * path is accepted as-is.
+ *
+ * @param {string} repoPath - absolute path to the repository being analysed
+ * @param {string} fileArg - the raw positional argument from argv
+ * @returns {string}
+ */
+function normalizeFileArg(repoPath, fileArg) {
+  const absolute = resolve(repoPath, fileArg);
+  const rel = relative(repoPath, absolute);
+  return rel.split(sep).join('/');
+}
+
 function main(argv) {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: argv,
+    allowPositionals: true,
     options: {
       repo: { type: 'string', default: process.cwd() },
       top: { type: 'string', default: '20' },
@@ -47,6 +71,10 @@ function main(argv) {
   if (values.help) {
     printHelp();
     return;
+  }
+
+  if (positionals.length > 1) {
+    throw new Error(`expected at most one file argument, got: ${positionals.join(' ')}`);
   }
 
   const repoPath = resolve(values.repo);
@@ -71,7 +99,13 @@ function main(argv) {
   const commitFileLists = getCommitFileLists(repoPath, options);
   const matrix = buildCoChangeMatrix(commitFileLists);
   const fileCounts = countFileAppearances(commitFileLists);
-  const scored = scoreCoupling(matrixToPairs(matrix), fileCounts);
+  let scored = scoreCoupling(matrixToPairs(matrix), fileCounts);
+
+  const fileArg = positionals[0];
+  const targetFile = fileArg === undefined ? undefined : normalizeFileArg(repoPath, fileArg);
+  if (targetFile !== undefined) {
+    scored = filterPairsByFile(scored, targetFile);
+  }
 
   if (values.heatmap) {
     const useColor = values.color || (!values['no-color'] && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR);
@@ -81,7 +115,11 @@ function main(argv) {
 
   const pairs = scored.slice(0, top);
   if (pairs.length === 0) {
-    console.log('no co-changed file pairs found');
+    console.log(
+      targetFile === undefined
+        ? 'no co-changed file pairs found'
+        : `no co-changed pairs found for file: ${targetFile}`,
+    );
     return;
   }
 

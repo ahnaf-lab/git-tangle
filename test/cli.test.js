@@ -109,3 +109,71 @@ test('CLI rejects passing --color and --no-color together', () => {
     });
   }, /Command failed/);
 });
+
+test('CLI single-file mode lists only pairs involving the given file', () => {
+  const { dir, git } = makeTempRepo();
+  try {
+    for (let i = 0; i < 3; i++) {
+      writeFileSync(join(dir, 'a.txt'), `rev ${i}\n`);
+      writeFileSync(join(dir, 'b.txt'), `rev ${i}\n`);
+      git('add', '.');
+      git('commit', '-q', '-m', `commit ${i}`);
+    }
+    // c.txt only ever changes with b.txt, and only once, so a/b should
+    // outrank b/c but both should appear when filtering on b.txt.
+    writeFileSync(join(dir, 'b.txt'), 'rev extra\n');
+    writeFileSync(join(dir, 'c.txt'), 'rev extra\n');
+    git('add', '.');
+    git('commit', '-q', '-m', 'commit with c');
+
+    const output = execFileSync('node', [CLI_PATH, '--repo', dir, 'b.txt'], { encoding: 'utf8' });
+    const lines = output.trim().split('\n');
+
+    assert.equal(lines.length, 2);
+    assert.ok(lines.every((line) => line.includes('b.txt')));
+    assert.ok(!output.includes('a.txt\tc.txt') && !output.includes('c.txt\ta.txt'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI single-file mode reports no pairs for a file with no co-changes', () => {
+  const { dir, git } = makeTempRepo();
+  try {
+    for (let i = 0; i < 2; i++) {
+      writeFileSync(join(dir, 'a.txt'), `rev ${i}\n`);
+      writeFileSync(join(dir, 'b.txt'), `rev ${i}\n`);
+      git('add', '.');
+      git('commit', '-q', '-m', `commit ${i}`);
+    }
+    writeFileSync(join(dir, 'solo.txt'), 'one\n');
+    git('add', '.');
+    git('commit', '-q', '-m', 'solo commit');
+
+    const output = execFileSync('node', [CLI_PATH, '--repo', dir, 'solo.txt'], { encoding: 'utf8' });
+
+    assert.match(output, /no co-changed pairs found for file: solo\.txt/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI single-file mode resolves a file argument given relative to cwd', () => {
+  const { dir, git } = makeTempRepo();
+  try {
+    for (let i = 0; i < 2; i++) {
+      writeFileSync(join(dir, 'a.txt'), `rev ${i}\n`);
+      writeFileSync(join(dir, 'b.txt'), `rev ${i}\n`);
+      git('add', '.');
+      git('commit', '-q', '-m', `commit ${i}`);
+    }
+
+    // No --repo given: repo defaults to cwd, and the file argument is
+    // resolved relative to that same cwd.
+    const output = execFileSync('node', [CLI_PATH, 'a.txt'], { encoding: 'utf8', cwd: dir });
+
+    assert.match(output, /^1\.00\t2\ta\.txt\tb\.txt$/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
