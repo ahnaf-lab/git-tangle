@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { resolve } from 'node:path';
 import { getCommitFileLists } from '../src/gitlog.js';
 import { buildCoChangeMatrix, matrixToPairs } from '../src/matrix.js';
+import { countFileAppearances, scoreCoupling } from '../src/score.js';
 
 function printHelp() {
   console.log(`git-tangle - mine commit history for files that change together
@@ -15,6 +16,9 @@ Options:
   --top <n>       number of strongest pairs to print (default: 20)
   --limit <n>     only look at the last <n> commits (default: all)
   --help          show this help text
+
+Output is one line per pair: score<TAB>count<TAB>fileA<TAB>fileB, sorted by
+score (0-1 coupling strength) with count as a tiebreak.
 `);
 }
 
@@ -51,15 +55,16 @@ function main(argv) {
 
   const commitFileLists = getCommitFileLists(repoPath, options);
   const matrix = buildCoChangeMatrix(commitFileLists);
-  const pairs = matrixToPairs(matrix).slice(0, top);
+  const fileCounts = countFileAppearances(commitFileLists);
+  const pairs = scoreCoupling(matrixToPairs(matrix), fileCounts).slice(0, top);
 
   if (pairs.length === 0) {
     console.log('no co-changed file pairs found');
     return;
   }
 
-  for (const { a, b, count } of pairs) {
-    console.log(`${count}\t${a}\t${b}`);
+  for (const { a, b, count, score } of pairs) {
+    console.log(`${score.toFixed(2)}\t${count}\t${a}\t${b}`);
   }
 }
 

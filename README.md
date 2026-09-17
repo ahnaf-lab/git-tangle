@@ -5,8 +5,8 @@ together, so that before you refactor a file you can see what silently breaks
 alongside it.
 
 This is an early, in-progress build: the current version walks the commit
-history and builds a pairwise co-change count matrix, printed as a plain
-ranked list. Coupling scores and the ASCII heatmap view are not built yet.
+history, builds a pairwise co-change count matrix, and normalizes each pair
+into a 0-1 coupling score. The ASCII heatmap view is not built yet.
 
 ## Install
 
@@ -39,15 +39,19 @@ Or, without linking:
 node bin/git-tangle.js --repo /path/to/repo
 ```
 
-Output is one line per file pair, most co-changed first:
+Output is one line per file pair, strongest coupling first:
 
 ```
-12    src/api.js      src/api.test.js
-7     src/db.js       src/migrations.js
+0.86  12    src/api.js      src/api.test.js
+0.54  7     src/db.js       src/migrations.js
 ```
 
-Each line is `count<TAB>fileA<TAB>fileB`, where `count` is the number of
-commits in which both files changed together.
+Each line is `score<TAB>count<TAB>fileA<TAB>fileB`. `count` is the number of
+commits in which both files changed together; `score` is that count divided
+by the number of commits that touched *either* file (a Jaccard index), so a
+pair that always changes together scores close to 1 even with a small commit
+count, while a pair that only occasionally overlaps — because one file also
+changes for unrelated reasons — scores lower despite a larger raw count.
 
 Options:
 
@@ -60,9 +64,11 @@ Options:
 
 `git-tangle` shells out to `git log --name-only` to list every commit and the
 files it touched, then counts every unordered pair of files that appear
-together in the same commit. No network calls are made and no dependencies
-are installed beyond Node's standard library and the `git` binary already on
-your system.
+together in the same commit. Each pair's raw count is normalized into a 0-1
+coupling score (a Jaccard index over the commits touching either file), so
+pairs are ranked by how *reliably* they change together, not just how often.
+No network calls are made and no dependencies are installed beyond Node's
+standard library and the `git` binary already on your system.
 
 ## Status
 

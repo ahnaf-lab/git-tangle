@@ -31,7 +31,7 @@ test('CLI prints the strongest co-changed pair for a repo', () => {
 
     const output = execFileSync('node', [CLI_PATH, '--repo', dir], { encoding: 'utf8' });
 
-    assert.match(output, /^2\ta\.txt\tb\.txt$/m);
+    assert.match(output, /^1\.00\t2\ta\.txt\tb\.txt$/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
