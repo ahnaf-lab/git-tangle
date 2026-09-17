@@ -1,0 +1,17 @@
+{
+  "name": "git-tangle",
+  "version": "0.1.0",
+  "description": "Mines commit history for files that habitually change together and scores the coupling.",
+  "type": "module",
+  "bin": {
+    "git-tangle": "./bin/git-tangle.js"
+  },
+  "engines": {
+    "node": ">=18.3.0"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "license": "MIT",
+  "private": false
+}
